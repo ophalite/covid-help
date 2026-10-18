@@ -367,7 +367,7 @@ const FRASES = {
     "Volviste, y yo ya me había inventado tres excusas.",
     "Me porté bien mientras no estabas. Hay testigos. Pocos.",
     "Qué bueno que volviste. Con la nevera no se puede conversar.",
-    "{d} días. Me acostumbré a decir 'mañana empiezo'."
+    "{d} días. Hice lo que pude. Que no es lo mismo que lo que debía."
   ],
   // Saludos de fechas especiales (ver fechaEspecial)
   f_anio_nuevo:[
@@ -382,6 +382,9 @@ const FRASES = {
   f_amor_amistad:[
     "Me dicen que hoy es Amor y Amistad. En Uruguay no hay. Yo ya traía lo primero.",
     "Amor y Amistad: ¿el chocolate cuenta como detalle? Pregunto por un amigo."
+  ],
+  f_octubre:[
+    "Octubre: dulces en todas partes y yo vine a consulta. Merezco una medalla."
   ],
   f_halloween:[
     "Hoy es día de dulces. Pido que se suspenda el plan, solo por hoy.",
@@ -533,7 +536,7 @@ const FRASES = {
     "Bajé de 80. Sin tos y sin fiebre. Solo orgullo."
   ],
   recaida:[
-    "Rebrote confirmado… volvemos a cuarentena. 🚨",
+    "Volvemos a cuarentena. Duró poco la libertad. 🚨",
     "Mi panza tuvo una recaída. Fue culpa de ese dulce.",
     "Fue un descuido. Uno pequeño. Con chocolate.",
     "Recaída técnica. No cuenta.",
@@ -544,7 +547,6 @@ const FRASES = {
     "No fue una recaída. Fue una visita a mi antiguo yo."
   ],
   lunes:[
-    "Bueno… empiezo el lunes. 📅",
     "El lunes empiezo. Este no, el otro.",
     "Hoy no cuenta, es día de antojo.",
     "Esto es solo un descanso del plan.",
@@ -1123,8 +1125,41 @@ async function pedirNota(){
   }catch(e){ return ""; }
 }
 
+/* Guarda un resumen mínimo de la consulta para que Covid la recuerde la próxima vez */
+function guardarConsulta(gano){
+  const c = estado.conteo || {};
+  const fav = Object.entries(estado.porNombre || {}).filter(([n]) => n !== "Agua").sort((a,b) => b[1] - a[1])[0];
+  try{
+    localStorage.setItem("covid-ultima-consulta", JSON.stringify({
+      gano, peso: Math.round(estado.peso*10)/10, consultas: estado.consultas,
+      fav: fav ? fav[0] : "", favVeces: fav ? fav[1] : 0,
+      golosinas: c.golosina || 0, agua: c.agua || 0
+    }));
+  }catch(e){}
+}
+function leerUltimaConsulta(){
+  try{
+    const g = JSON.parse(localStorage.getItem("covid-ultima-consulta") || "null");
+    return g && typeof g === "object" ? g : null;
+  }catch(e){ return null; }
+}
+/* Saludo escrito por la IA que menciona la consulta anterior. Si falla, devuelve "" y se usa el saludo de siempre. */
+async function pedirRecuerdo(previo, dias){
+  if(!hayIA() || llamadasPartida >= MAX_VIVO_POR_PARTIDA) return "";
+  llamadasPartida++;
+  const cuando = dias >= 1 ? `después de ${dias} ${dias === 1 ? "día" : "días"}` : "el mismo día";
+  const fin = previo.gano ? `Terminó con el alta: bajó a ${previo.peso} kg.` : `Terminó mal: se pasó de golosinas hasta ${previo.peso} kg.`;
+  const resumen = `${fin} Fueron ${previo.consultas} turnos. ` + (previo.fav ? `Lo que más le dio fue ${String(previo.fav).toLowerCase()} (${previo.favVeces} veces). ` : "") + `Le dio ${previo.golosinas} golosinas y ${previo.agua} vasos de agua.`;
+  try{
+    const txt = await llamarGemini(`${PERSONA()}\nSituación: vuelves a la consulta con Jeiny ${cuando}. La consulta anterior: ${resumen}\nSaluda mencionando con gracia algo concreto de esa consulta anterior.\nResponde SOLO con una frase nueva y corta, sin comillas; puedes usar un emoji.`, { timeout: 3500 });
+    const f = txt.replace(/^["“]|["”]$/g,"").split("\n")[0].trim();
+    return f.length > 5 && f.length < 140 && !APELATIVOS.test(f) ? f : "";
+  }catch(e){ return ""; }
+}
+
 async function terminar(gano){
   estado.jugando = false; clearTimeout(temporizadorPedir);
+  guardarConsulta(gano);
   const cat = gano ? "victoria" : "derrota";
   ponerAnimo(gano ? "amor" : "feliz", 0);
   if(gano){ particulas("💘", 8); globos(); }
@@ -1220,8 +1255,14 @@ async function empezar(){
   actualizarStats(); pintarDragon(); bloquear(false);
   particulas("💗", 5); ponerAnimo("amor", 3000);
   const dias = diasDesdeUltimaVisita();
-  const saludo = fechaEspecial() || (dias >= 2 ? "regreso" : "saludo");   // una fecha especial gana sobre el regreso
-  decir("…"); decir((await frase(saludo)).replace("{d}", dias));
+  const previo = leerUltimaConsulta();
+  // una fecha especial gana sobre el regreso; en octubre, la mitad de las veces sale el saludo del mes de los dulces
+  const especial = fechaEspecial() || (new Date().getMonth() === 9 && Math.random() < 0.5 ? "f_octubre" : null);
+  const saludo = especial || (dias >= 2 ? "regreso" : "saludo");
+  decir("…");
+  let recuerdo = "";
+  if(previo && !especial && Math.random() < 0.6) recuerdo = await pedirRecuerdo(previo, dias);   // 6 de cada 10 veces recuerda la consulta anterior
+  decir(recuerdo || (await frase(saludo)).replace("{d}", dias));
   reiniciarPedido();
 }
 
