@@ -726,7 +726,7 @@ const FRASES_BASE = JSON.parse(JSON.stringify(FRASES));
 const configsFirebase = () => (CONFIG.FIREBASE_CONFIGS || []).filter(c => c && c.apiKey && c.projectId);
 const hayIA = () => !!CONFIG.GEMINI_MODEL && configsFirebase().length > 0;   // sin modelo, la IA queda apagada
 // Apelativos cariñosos que Covid nunca debe decirle a la doctora (se descartan las frases que los traigan)
-const APELATIVOS = /(?<!\p{L})(mi amor|amor mío|mi cielo|mi reina|mi princesa|mi corazón|mi vida|cariño|preciosa|hermosa|bonita|guapa|linda|lindura|mami|bebé)(?!\p{L})/iu;
+const APELATIVOS = /(^|[^\p{L}])(mi amor|amor mío|mi cielo|mi reina|mi princesa|mi corazón|mi vida|cariño|preciosa|hermosa|bonita|guapa|linda|lindura|mami|bebé)(?![\p{L}])/iu;   // sin lookbehind: así carga también en iPhones antiguos
 let modelosIA = null;   // se preparan una sola vez
 
 let preparandoIA = null;
