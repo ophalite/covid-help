@@ -217,13 +217,14 @@ body{margin:0;min-height:100%;background:var(--fondo);color:var(--texto);font-fa
 .boton:focus-visible{outline:3px solid #7dff9a;outline-offset:4px}
 @media (prefers-reduced-motion: reduce){ *{animation-duration:.01ms!important;animation-iteration-count:1!important;transition:none!important} }
 </style>
+<link rel="stylesheet" href="chat.css">
 </head>
 <body>
 <main class="juego">
   <header class="cabecera caja">
     <div class="fila-titulo">
       <h1>Covid<span class="extra"> a Dieta</span></h1>
-      <div class="derecha"><span class="peso" id="peso">120 kg</span><button class="mudo" id="mudo" aria-label="Silenciar sonido">🔊</button></div>
+      <div class="derecha"><span class="peso" id="peso">120 kg</span><button class="mudo" id="chatBtn" aria-label="Hablar con Covid" hidden>💬</button><button class="mudo" id="mudo" aria-label="Silenciar sonido">🔊</button></div>
     </div>
     <p id="subtitulo">Consulta de nutrición con Jeiny</p>
     <div class="camino" role="progressbar" aria-label="Progreso hacia la meta" aria-valuemin="0" aria-valuemax="100" id="camino">
@@ -293,6 +294,8 @@ body{margin:0;min-height:100%;background:var(--fondo);color:var(--texto);font-fa
     <button class="boton" id="cerrarSecreto">Cerrar</button>
   </div>
 </div>
+
+<div class="pantalla" id="chat" hidden></div>
 
 <div class="pantalla" id="final" hidden>
   <div class="tarjeta caja" id="finalCaja"></div>
@@ -1329,5 +1332,6 @@ function diasDesdeUltimaVisita(){
 })();
 
 </script>
+<script src="chat.js"></script>
 </body>
 </html>
