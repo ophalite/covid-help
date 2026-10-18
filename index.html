@@ -369,6 +369,36 @@ const FRASES = {
     "Qué bueno que volviste. Con la nevera no se puede conversar.",
     "{d} días. Me acostumbré a decir 'mañana empiezo'."
   ],
+  // Saludos de fechas especiales (ver fechaEspecial)
+  f_anio_nuevo:[
+    "Feliz año. Mi propósito es el mismo del año pasado. Sigo en proceso.",
+    "Feliz año, doctora. Este año sí empiezo el lunes. Cualquier lunes."
+  ],
+  f_nutricionista:[
+    "Hoy se celebra a quien me aguanta. Gracias, doctora.",
+    "Feliz Día del Nutricionista. Por hoy tengo permiso para portarme bien.",
+    "Hoy es el Día del Nutricionista. Hoy no hay excusas. Prometo nada, pero hoy no hay."
+  ],
+  f_amor_amistad:[
+    "Me dicen que hoy es Amor y Amistad. En Uruguay no hay. Yo ya traía lo primero.",
+    "Amor y Amistad: ¿el chocolate cuenta como detalle? Pregunto por un amigo."
+  ],
+  f_halloween:[
+    "Hoy es día de dulces. Pido que se suspenda el plan, solo por hoy.",
+    "Halloween. Voy disfrazado de paciente que cumple el plan. Da miedo."
+  ],
+  f_velitas:[
+    "Hoy hay velitas. Prendí una por mi plan de alimentación. Se apagó sola.",
+    "Día de las Velitas: una por la dieta, una por la torta. La torta sigue prendida."
+  ],
+  f_navidad:[
+    "Feliz Navidad, doctora. La natilla no cuenta, por si preguntan.",
+    "Me contaron que hoy hay natilla y buñuelos. Pido que se suspenda la consulta."
+  ],
+  f_fin_anio:[
+    "Dicen que hoy se comen doce uvas. Es fruta. Cuenta.",
+    "Resumen del año: bajé, subí, bajé. Estoy en equilibrio."
+  ],
   pedir:[
     "¿Y si me recetas una donita? 🍩",
     "¿La torta cuenta como verdura si tiene zanahoria?",
@@ -1078,18 +1108,36 @@ function escudoSVG(){
   return `<svg viewBox="0 0 5 6" shape-rendering="crispEdges" aria-hidden="true">${o}</svg>`;
 }
 
+/* Observación para la receta, escrita por la IA con los datos reales de la partida.
+   Si la IA no responde o se acabó el cupo, devuelve "" y la receta queda como la de siempre. */
+async function pedirNota(){
+  if(!hayIA() || llamadasPartida >= MAX_VIVO_POR_PARTIDA) return "";
+  llamadasPartida++;
+  const c = estado.conteo || {};
+  const fav = Object.entries(estado.porNombre || {}).filter(([n]) => n !== "Agua").sort((a,b) => b[1] - a[1])[0];
+  const datos = `Peso: de ${PESO_INICIAL} kg a ${Math.round(estado.peso*10)/10} kg en ${estado.consultas} turnos. Le dieron ${c.fruta||0} frutas, ${c.verdura||0} verduras, ${c.fibra||0} de fibra, ${c.golosina||0} golosinas y ${c.agua||0} vasos de agua.` + (fav ? ` Lo que más comió: ${fav[0].toLowerCase()} (${fav[1]} veces).` : "");
+  try{
+    const txt = await llamarGemini(`Escribe UNA observación para la historia clínica del paciente Covid, un dragoncito, al darle el alta. Tercera persona, tono serio de informe médico pero tierno, con humor seco: la gracia está en lo serio que suena, nunca la expliques. Usa uno o dos datos reales de esta consulta. Máximo 22 palabras, una sola frase, sin comillas, sin emojis, sin apelativos cariñosos. Datos: ${datos}`, { maxTokens: 250, timeout: 4500 });
+    const nota = txt.replace(/^["“]|["”]$/g,"").split("\n")[0].trim();
+    return nota.length > 10 && nota.length < 180 && !APELATIVOS.test(nota) ? nota : "";
+  }catch(e){ return ""; }
+}
+
 async function terminar(gano){
   estado.jugando = false; clearTimeout(temporizadorPedir);
   const cat = gano ? "victoria" : "derrota";
   ponerAnimo(gano ? "amor" : "feliz", 0);
   if(gano){ particulas("💘", 8); globos(); }
   sonido(gano ? "ganar" : "perder");
+  const notaPendiente = gano ? pedirNota() : Promise.resolve("");
   const texto = await frase(cat);
   decir(texto);
-  setTimeout(()=>{
+  setTimeout(async ()=>{
+    const nota = await notaPendiente;
     const caja = $("finalCaja");
     if(gano){
-      const fecha = new Date().toLocaleDateString("es-UY", { day:"numeric", month:"long", year:"numeric" });
+      const diaNutri = fechaEspecial() === "f_nutricionista";
+      const fecha = new Date().toLocaleDateString("es-CO", { day:"numeric", month:"long", year:"numeric" });
       caja.className = "tarjeta historia receta";
       caja.innerHTML = `
         <div class="h-top">
@@ -1104,6 +1152,7 @@ async function terminar(gano){
             <dt>Fecha</dt><dd>${fecha}</dd>
             <div class="sep"></div>
             <dt>Diagnóstico</dt><dd>Sano, hidratado y perdidamente enamorado</dd>
+            ${nota ? '<dt>Observaciones</dt><dd id="notaIA"></dd>' : ""}
           </dl>
           <p class="rp-t">Rp/</p>
           <ul class="rp">
@@ -1123,8 +1172,9 @@ async function terminar(gano){
           <div class="firma"><span>Jeiny</span><small>Nutricionista</small></div>
           <button class="boton" id="otraVez">Jugar otra vez</button>
         </div>
-        <div class="sello" aria-hidden="true">Alta con<br>cariño</div>`;
+        <div class="sello" aria-hidden="true">${diaNutri ? "Feliz día<br>doctora" : "Alta con<br>cariño"}</div>`;
       $("citaFinal").textContent = `“${texto.replace(/💜/g,"").trim()}”`;
+      if(nota) $("notaIA").textContent = nota;
     } else {
       caja.className = "tarjeta caja";
       caja.innerHTML = `
@@ -1170,8 +1220,22 @@ async function empezar(){
   actualizarStats(); pintarDragon(); bloquear(false);
   particulas("💗", 5); ponerAnimo("amor", 3000);
   const dias = diasDesdeUltimaVisita();
-  decir("…"); decir((await frase(dias >= 2 ? "regreso" : "saludo")).replace("{d}", dias));
+  const saludo = fechaEspecial() || (dias >= 2 ? "regreso" : "saludo");   // una fecha especial gana sobre el regreso
+  decir("…"); decir((await frase(saludo)).replace("{d}", dias));
   reiniciarPedido();
+}
+
+/* Fechas especiales de Colombia: devuelve la categoría de frases del día, o null */
+function fechaEspecial(d = new Date()){
+  const mes = d.getMonth() + 1, dia = d.getDate();
+  if(mes === 1 && dia === 1) return "f_anio_nuevo";
+  if(mes === 8 && dia === 10) return "f_nutricionista";                       // Día del Nutricionista
+  if(mes === 9 && d.getDay() === 6 && dia >= 15 && dia <= 21) return "f_amor_amistad";   // 3.er sábado de septiembre
+  if(mes === 10 && dia === 31) return "f_halloween";
+  if(mes === 12 && dia === 7) return "f_velitas";
+  if(mes === 12 && (dia === 24 || dia === 25)) return "f_navidad";
+  if(mes === 12 && dia === 31) return "f_fin_anio";
+  return null;
 }
 
 /* Recuerda en el navegador cuándo fue la última consulta */
