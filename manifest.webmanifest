@@ -1,7 +1,7 @@
 {
   "name": "Covid a Dieta",
   "short_name": "Covid",
-  "description": "Un juego de Ophelia Games para Jeiny.",
+  "description": "Un juego de Ophelia Games.",
   "lang": "es",
   "start_url": "./",
   "scope": "./",
