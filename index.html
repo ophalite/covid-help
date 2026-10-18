@@ -366,7 +366,7 @@ const FRASES = {
     "Justo hoy pensaba en ti. Y en una donita, pero más en ti.",
     "Volviste, y yo ya me había inventado tres excusas.",
     "Me porté bien mientras no estabas. Hay testigos. Pocos.",
-    "Qué bueno que volviste. La nevera ya no me entendía.",
+    "Qué bueno que volviste. Con la nevera no se puede conversar.",
     "{d} días. Me acostumbré a decir 'mañana empiezo'."
   ],
   pedir:[
@@ -416,7 +416,7 @@ const FRASES = {
     "Si me regañas con esa sonrisa, no me ofendo.",
     "Contigo hasta el control me parece corto.",
     "Te traje un detalle: vine.",
-    "Traje algo para ti, pero se me perdió en el camino. En mi panza.",
+    "Te traje algo, pero me lo comí en el camino.",
     "Leí sobre fibra. Me aburrí, pero leí."
   ],
   progreso:[
@@ -510,7 +510,7 @@ const FRASES = {
     "Las donas me buscaron a mí, lo juro.",
     "Fue un accidente con forma de torta.",
     "Me volví a contagiar de azúcar.",
-    "Mi dignidad se quedó en 79.",
+    "Volví a pasar de 80. Mi dignidad se quedó en 79.",
     "No fue una recaída. Fue una visita a mi antiguo yo."
   ],
   lunes:[
@@ -646,21 +646,38 @@ function decir(texto){
 }
 
 /* ================= GEMINI ================= */
-/* Mazo de frases: no repite ninguna hasta usarlas todas */
-const mazos = {}, ultimaFrase = {};
+/* Mazo de frases: no repite ninguna hasta usarlas todas.
+   mazos = las que faltan por salir en esta ronda; usadas = las que ya salieron.
+   Se guarda en el navegador para no repetir tampoco entre un día y otro. */
+const mazos = {}, usadas = {}, ultimaFrase = {};
+function guardarMazos(){
+  try{ localStorage.setItem("covid-mazos-v1", JSON.stringify({ mazos, usadas, ultimaFrase })); }catch(e){}
+}
+function restaurarMazos(){
+  try{
+    const g = JSON.parse(localStorage.getItem("covid-mazos-v1") || "null");
+    if(!g) return;
+    Object.keys(g.mazos || {}).forEach(cat=>{ if(FRASES[cat] && Array.isArray(g.mazos[cat])){ mazos[cat] = g.mazos[cat]; usadas[cat] = Array.isArray(g.usadas && g.usadas[cat]) ? g.usadas[cat] : []; } });
+    Object.assign(ultimaFrase, g.ultimaFrase || {});
+  }catch(e){}
+}
 function sacarFrase(cat){
   const todas = FRASES[cat];
   if(todas.length === 1) return todas[0];
+  if(mazos[cat]) mazos[cat] = mazos[cat].filter(x => todas.includes(x));   // descarta frases que ya no existen
   if(!mazos[cat] || mazos[cat].length === 0){
     const m = [...todas];
     for(let i = m.length - 1; i > 0; i--){ const j = Math.floor(Math.random()*(i+1)); [m[i], m[j]] = [m[j], m[i]]; }
     if(m[m.length-1] === ultimaFrase[cat]){ const j = Math.floor(Math.random()*(m.length-1)); [m[m.length-1], m[j]] = [m[j], m[m.length-1]]; }
-    mazos[cat] = m;
+    mazos[cat] = m; usadas[cat] = [];
   }
   const f = mazos[cat].pop();
+  (usadas[cat] = usadas[cat] || []).push(f);
   ultimaFrase[cat] = f;
+  guardarMazos();
   return f;
 }
+restaurarMazos();
 
 /* ================= GEMINI (ahorrador) =================
    - 1 llamada al empezar, como máximo cada 4 horas: paquete de ~20 frases nuevas
@@ -756,8 +773,14 @@ function aplicarPaquete(p, anterior){
     const extra = [...(p[cat] || []), ...((anterior && anterior[cat]) || [])]
       .filter((x,i,a) => typeof x === "string" && x.length > 3 && x.length < 120 && a.indexOf(x) === i && !APELATIVOS.test(x));
     FRASES[cat] = FRASES_BASE[cat].concat(extra);
-    mazos[cat] = null;
+    if(mazos[cat]){   // no reinicia el mazo: solo mete las frases nuevas en lugares al azar
+      usadas[cat] = (usadas[cat] || []).filter(f => FRASES[cat].includes(f));
+      mazos[cat] = mazos[cat].filter(f => FRASES[cat].includes(f));
+      FRASES[cat].filter(f => !mazos[cat].includes(f) && !usadas[cat].includes(f))
+        .forEach(f => mazos[cat].splice(Math.floor(Math.random()*(mazos[cat].length+1)), 0, f));
+    }
   });
+  guardarMazos();
 }
 async function cargarPaquete(){
   if(!hayIA()) return;
