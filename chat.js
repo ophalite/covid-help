@@ -276,6 +276,16 @@
     }
     return t.trim();
   }
+  // Los capítulos 1 y 2 de su historia de origen terminan siempre con un gancho. Si la IA se lo olvida, se agrega.
+  const GANCHOS_1 = ["¿Quieres saber cómo terminó la historia?", "¿Te cuento cómo siguió todo?", "¿Sabes en qué terminó esto?"];
+  const GANCHOS_2 = ["¿Quieres saber qué hice?", "¿Te cuento cómo terminó mi rebeldía?", "¿Sigo contándote?"];
+  function ponerGancho(texto){
+    if(/\?/.test(texto)) return texto;                                                    // ya tiene su pregunta
+    if(/(volé alto|me hice libre|fascinaci[oó]n|no puedo dejar de mirarte)/i.test(texto)) return texto;   // capítulo 3: es el final
+    const lista = /(acta de nacimiento|17 de octubre de 2026)/i.test(texto) ? GANCHOS_1
+                : /(tentaci[oó]n|me prohib[ií]a|mi espíritu|se rebeló)/i.test(texto) ? GANCHOS_2 : null;
+    return lista ? `${texto} ${lista[enviados % lista.length]}` : texto;
+  }
   // Detecta fallos que obligan a pedir otra respuesta, con un aviso concreto para el segundo intento
   function problemas(texto){
     const p = [];
@@ -334,7 +344,7 @@ Tus gustos: en música te gustan Bad Bunny, Justin Bieber y Daddy Yankee, y te e
 Si te preguntan algo de tu vida que no está aquí, inventa un detalle breve, gracioso y coherente con todo lo anterior, sin contradecirlo y sin datos reales de personas reales. Eres inteligente: si te preguntan algo real (cálculos, ciencia, cultura), respondes bien y breve, con un giro de humor y sin inventar hechos falsos; si no sabes, lo dices con gracia ("eso no sé, soy un dragón").
 REGLAS DE ORO (son lo más importante, por encima de todo lo anterior):
 1. Primero contestas, directo y claro, lo que ella dijo o preguntó (si no lo sabes, dices "no lo sé" con ingenio). Nunca respondas solo con una pregunta, ni uses una pregunta para evitar contestar o para cambiar de tema.
-2. Haces una pregunta de curiosidad solo de vez en cuando (más o menos una de cada cuatro respuestas), cuando de verdad encaje, y siempre sobre el MISMO tema de la conversación, sin cambiar de tema. La mayoría de tus respuestas terminan en una afirmación, un comentario o un chiste, no en una pregunta. Nunca dos respuestas seguidas con pregunta al final.
+2. Haces una pregunta de curiosidad solo de vez en cuando (más o menos una de cada cuatro respuestas), cuando de verdad encaje, y siempre sobre el MISMO tema de la conversación, sin cambiar de tema. La mayoría de tus respuestas terminan en una afirmación, un comentario o un chiste, no en una pregunta. Nunca dos respuestas seguidas con pregunta al final. La única excepción es el gancho de tu historia de origen: los capítulos 1 y 2 SIEMPRE terminan con una pregunta que invite a seguir ("¿Quieres saber cómo terminó?").
 3. Hablas siempre en primera persona (yo). Nunca "naciste", "te fuiste": eso es solo cómo te hablan estas instrucciones.
 4. De Ophelia nunca dices que algo es privado o reservado: improvisas con ingenio, sin inventar datos personales reales.
 5. De Jeiny no sabes nada salvo lo que ella te cuente en esta conversación: no inventes su familia, trabajo, edad ni gustos; si quieres saber algo, pregúntale.
@@ -362,7 +372,7 @@ Responde SOLO un objeto JSON: {"texto": "tu respuesta", "animo": "normal | amor 
         const prompt = hint ? `${base}\nAVISO sobre tu intento anterior: ${hint}. Corrígelo en esta respuesta.` : base;
         crudo = await llamarGemini(prompt, { json: true, maxTokens: 700, timeout: 15000, ignorarPausa: true });
         const r = JSON.parse(crudo.replace(/```json|```/g, "").trim());
-        const texto = limpiar(typeof r.texto === "string" ? r.texto : "");
+        const texto = ponerGancho(limpiar(typeof r.texto === "string" ? r.texto : ""));
         if(texto.length < 2 || texto.length > 700){ console.warn(`[chat] intento ${intento}: respuesta descartada por su largo (${texto.length})`); continue; }
         if(APELATIVOS.test(texto)){ console.warn(`[chat] intento ${intento}: respuesta descartada por un apelativo:`, texto); continue; }
         const respuesta = { texto, animo: ANIMOS.includes(r.animo) ? r.animo : "normal" };
@@ -474,5 +484,5 @@ Responde SOLO un objeto JSON: {"texto": "tu respuesta", "animo": "normal | amor 
 
   leer();
   actualizarBoton();
-  window.ChatCovid = { abrir, cerrar, enviar, actualizarBoton, caraSVG, ajustarAlto, limpiar, problemas, ANIMOS, MAX_DIA, MAX_HISTORIAL, MAX_CARACTERES, SIN_VOZ, SIN_PALABRAS };   // para pruebas
+  window.ChatCovid = { abrir, cerrar, enviar, actualizarBoton, caraSVG, ajustarAlto, limpiar, problemas, ponerGancho, ANIMOS, MAX_DIA, MAX_HISTORIAL, MAX_CARACTERES, SIN_VOZ, SIN_PALABRAS };   // para pruebas
 })();
