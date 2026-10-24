@@ -79,13 +79,15 @@
   const azar = a => a[Math.floor(Math.random() * a.length)];
   const hoy = () => { const d = new Date(); return `${d.getFullYear()}-${d.getMonth()+1}-${d.getDate()}`; };
 
-  let historial = [], dia = hoy(), enviados = 0, ocupado = false, temporizadorAnimo = null;
+  const esperar = ms => new Promise(r => setTimeout(r, ms));
+  let historial = [], dia = hoy(), enviados = 0, ocupado = false;
 
   function leer(){
     try{
       const g = JSON.parse(localStorage.getItem(CLAVE) || "null");
       if(!g) return;
-      if(Array.isArray(g.h)) historial = g.h.filter(m => m && (m.de === "jeiny" || m.de === "covid") && typeof m.t === "string").slice(-MAX_HISTORIAL);
+      if(Array.isArray(g.h)) historial = g.h.filter(m => m && (m.de === "jeiny" || m.de === "covid") && typeof m.t === "string")
+        .map(m => ({ de: m.de, t: m.t, a: ANIMOS.includes(m.a) ? m.a : "normal" })).slice(-MAX_HISTORIAL);
       if(g.dia === hoy()){ dia = g.dia; enviados = Number(g.n) || 0; }
     }catch(e){}
   }
@@ -100,54 +102,90 @@
   if(!pantalla || !boton) return;
 
   pantalla.innerHTML = `
-    <div class="tarjeta historia chat-tarjeta" role="dialog" aria-modal="true" aria-label="Conversación con Covid">
+    <div class="chat-tarjeta" role="dialog" aria-modal="true" aria-label="Conversación con Covid">
       <div class="chat-barra">
-        <button class="chat-borrar" id="chatBorrar" type="button">🗑 Borrar conversación</button>
+        <button class="chat-borrar" id="chatBorrar" type="button" aria-label="Borrar la conversación">🗑 Borrar</button>
+        <span class="chat-contador" id="chatContador"></span>
         <button class="chat-cerrar" id="chatCerrar" type="button" aria-label="Cerrar la conversación">✕</button>
       </div>
-      <div class="chat-cuerpo">
-        <div class="chat-cara" id="chatCara" role="img" aria-label="Covid"></div>
-        <div class="chat-mensajes" id="chatMensajes" aria-live="polite"></div>
-        <form class="chat-form" id="chatForm" autocomplete="off">
-          <input id="chatTexto" type="text" maxlength="${MAX_CARACTERES}" placeholder="Escríbele a Covid…" aria-label="Mensaje para Covid" enterkeyhint="send">
-          <button class="boton chat-enviar" id="chatEnviar" type="submit" aria-label="Enviar">➤</button>
-        </form>
-        <p class="chat-contador" id="chatContador"></p>
-      </div>
+      <div class="chat-mensajes" id="chatMensajes" role="log" aria-live="polite"></div>
+      <form class="chat-form" id="chatForm" autocomplete="off">
+        <input id="chatTexto" type="text" maxlength="${MAX_CARACTERES}" placeholder="Escribe un mensaje…" aria-label="Mensaje para Covid" enterkeyhint="send" autocapitalize="sentences">
+        <button class="chat-enviar" id="chatEnviar" type="submit" aria-label="Enviar">➤</button>
+      </form>
     </div>`;
   const $c = id => document.getElementById(id);
+  const zona = () => $c("chatMensajes");
+  const bajar = () => { zona().scrollTop = zona().scrollHeight; };
 
-  function pintarCara(animo){
-    $c("chatCara").innerHTML = caraSVG(animo);
+  // Carita redonda de Covid con el gesto del mensaje
+  function avatar(animo, extra){
+    const a = document.createElement("div");
+    a.className = "avatar" + (extra ? " " + extra : "");
+    a.setAttribute("aria-hidden", "true");
+    a.innerHTML = caraSVG(animo);
+    return a;
   }
-  function ponerAnimo(animo){
-    pintarCara(animo);
-    clearTimeout(temporizadorAnimo);
-    if(animo !== "normal") temporizadorAnimo = setTimeout(() => pintarCara("normal"), 6000);
+  // ✓ enviado, ✓✓ Covid ya lo leyó
+  function marcarVisto(m, doble){
+    const v = m.querySelector(".visto");
+    if(v) v.textContent = doble ? "✓✓" : "✓";
   }
-  function burbuja(de, texto, extra){
+  function burbuja(de, texto, animo, nuevo){
+    const m = document.createElement("div");
+    m.className = "msg " + de + (nuevo ? " nuevo" : "");
+    if(de === "covid") m.appendChild(avatar(animo || "normal"));
     const b = document.createElement("div");
-    b.className = "burbuja " + de + (extra ? " " + extra : "");
-    b.textContent = texto;
-    $c("chatMensajes").appendChild(b);
-    $c("chatMensajes").scrollTop = $c("chatMensajes").scrollHeight;
-    return b;
+    b.className = "burbuja";
+    const t = document.createElement("span");
+    t.className = "texto"; t.textContent = texto;
+    b.appendChild(t);
+    if(de === "jeiny"){
+      const v = document.createElement("span");
+      v.className = "visto"; v.textContent = "✓✓";
+      b.appendChild(v);
+    }
+    m.appendChild(b);
+    zona().appendChild(m); bajar();
+    return m;
   }
   function burbujaEscribiendo(){
+    const m = document.createElement("div");
+    m.className = "msg covid escribiendo";
+    m.appendChild(avatar("pensativo", "balanceo"));
     const b = document.createElement("div");
-    b.className = "burbuja covid escribiendo";
-    b.innerHTML = `Covid está escribiendo<span class="puntos" aria-hidden="true"><i></i><i></i><i></i></span>`;
-    $c("chatMensajes").appendChild(b);
-    $c("chatMensajes").scrollTop = $c("chatMensajes").scrollHeight;
-    return b;
+    b.className = "burbuja";
+    b.innerHTML = `escribiendo<span class="puntos" aria-hidden="true"><i></i><i></i><i></i></span>`;
+    m.appendChild(b);
+    zona().appendChild(m); bajar();
+    return m;
   }
   function pintarHistorial(){
-    $c("chatMensajes").innerHTML = "";
-    historial.forEach(m => burbuja(m.de, m.t));
+    zona().innerHTML = "";
+    historial.forEach(m => burbuja(m.de, m.t, m.a, false));
   }
   function pintarContador(){
     nuevoDia();
-    $c("chatContador").textContent = `Mensajes de hoy: ${enviados}/${MAX_DIA}`;
+    const c = $c("chatContador");
+    c.textContent = `${enviados}/${MAX_DIA}`;
+    c.setAttribute("aria-label", `Mensajes de hoy: ${enviados} de ${MAX_DIA}`);
+    c.title = "Mensajes de hoy";
+  }
+
+  // La pantalla ocupa solo el espacio visible sobre el teclado, así el campo de texto nunca queda tapado
+  function ajustarAlto(){
+    const v = window.visualViewport;
+    if(!v || pantalla.hidden) return;
+    pantalla.style.top = v.offsetTop + "px";
+    pantalla.style.height = v.height + "px";
+    bajar();
+  }
+  function seguirTeclado(activo){
+    const v = window.visualViewport;
+    if(!v) return;
+    const f = activo ? "addEventListener" : "removeEventListener";
+    v[f]("resize", ajustarAlto); v[f]("scroll", ajustarAlto);
+    if(!activo){ pantalla.style.top = ""; pantalla.style.height = ""; }
   }
 
   // ---------- IA ----------
@@ -184,41 +222,46 @@ Responde SOLO un objeto JSON: {"texto": "tu respuesta", "animo": "normal | amor 
     if(ocupado) return;
     const texto = String(entrada || "").trim().slice(0, MAX_CARACTERES);
     if(!texto) return;
-    ocupado = true; $c("chatEnviar").disabled = true; $c("chatBorrar").disabled = true;
+    // El campo de texto nunca se desactiva (así el teclado no se cierra); solo se frena enviar y borrar mientras Covid responde
+    ocupado = true; $c("chatEnviar").classList.add("ocupado"); $c("chatBorrar").disabled = true;
     nuevoDia();
-    historial.push({ de: "jeiny", t: texto });
-    burbuja("jeiny", texto);
-    let respuesta = null;
-    const escribiendo = burbujaEscribiendo(), inicio = Date.now();
-    clearTimeout(temporizadorAnimo); pintarCara("pensativo");   // mientras escribe, cara de pensar
+    historial.push({ de: "jeiny", t: texto, a: "normal" });
+    const mio = burbuja("jeiny", texto, null, true);
+    marcarVisto(mio, false);                                   // ✓ enviado
+    const inicio = Date.now();
+    let pedido;
     if(enviados >= MAX_DIA){
-      respuesta = { texto: SIN_PALABRAS, animo: "normal" };
+      pedido = Promise.resolve({ texto: SIN_PALABRAS, animo: "normal" });
     }else{
       enviados++;
-      respuesta = await pedirRespuesta() || { texto: azar(SIN_VOZ), animo: "normal" };
+      pedido = pedirRespuesta().then(r => r || { texto: azar(SIN_VOZ), animo: "normal" });
     }
-    // aunque la IA responda al instante, "escribe" un rato: más largo el mensaje, más tarda (entre 0,9 y 2,8 segundos)
+    await esperar(500);                                        // un instante antes de que Covid "lo lea"
+    marcarVisto(mio, true);                                    // ✓✓ leído
+    const escribiendo = burbujaEscribiendo();
+    const respuesta = await pedido;
+    // aunque la IA responda al instante, "escribe" un rato: más largo el mensaje, más tarda (entre 0,9 y 2,8 segundos en total)
     const espera = Math.min(2800, Math.max(900, 600 + respuesta.texto.length * 25));
-    await new Promise(r => setTimeout(r, Math.max(0, espera - (Date.now() - inicio))));
+    await esperar(Math.max(0, espera - (Date.now() - inicio)));
     escribiendo.remove();
-    historial.push({ de: "covid", t: respuesta.texto });
+    historial.push({ de: "covid", t: respuesta.texto, a: respuesta.animo });
     historial = historial.slice(-MAX_HISTORIAL);
-    burbuja("covid", respuesta.texto);
-    ponerAnimo(respuesta.animo);
+    burbuja("covid", respuesta.texto, respuesta.animo, true);
     guardar(); pintarContador();
-    ocupado = false; $c("chatEnviar").disabled = false; $c("chatBorrar").disabled = false;
+    ocupado = false; $c("chatEnviar").classList.remove("ocupado"); $c("chatBorrar").disabled = false;
     $c("chatTexto").focus();
   }
 
   function saludar(){
-    historial = [{ de: "covid", t: azar(FRASES.saludo) }];
+    historial = [{ de: "covid", t: azar(FRASES.saludo), a: "normal" }];
     guardar();
   }
   function abrir(){
     nuevoDia();
     if(historial.length === 0) saludar();
-    pintarHistorial(); pintarContador(); pintarCara("normal");
+    pintarHistorial(); pintarContador();
     pantalla.hidden = false;
+    seguirTeclado(true); ajustarAlto(); bajar();
     $c("chatTexto").focus();
   }
 
@@ -226,24 +269,25 @@ Responde SOLO un objeto JSON: {"texto": "tu respuesta", "animo": "normal | amor 
   let confirmandoBorrado = false, temporizadorBorrado = null;
   function reiniciarBotonBorrar(){
     confirmandoBorrado = false; clearTimeout(temporizadorBorrado);
-    $c("chatBorrar").textContent = "🗑 Borrar conversación";
+    $c("chatBorrar").textContent = "🗑 Borrar";
   }
   function borrar(){
     if(ocupado) return;
     if(!confirmandoBorrado){
       confirmandoBorrado = true;
-      $c("chatBorrar").textContent = "¿Seguro? Toca otra vez";
+      $c("chatBorrar").textContent = "¿Seguro?";
       temporizadorBorrado = setTimeout(reiniciarBotonBorrar, 3000);
       return;
     }
     reiniciarBotonBorrar();
-    clearTimeout(temporizadorAnimo);
     saludar();                                   // conversación limpia: solo el saludo de Covid
-    pintarHistorial(); pintarCara("normal");
+    pintarHistorial();
     $c("chatTexto").focus();
   }
   function cerrar(){
     reiniciarBotonBorrar();
+    seguirTeclado(false);
+    $c("chatTexto").blur();
     pantalla.hidden = true;
     boton.focus();
   }
@@ -255,12 +299,18 @@ Responde SOLO un objeto JSON: {"texto": "tu respuesta", "animo": "normal | amor 
   $c("chatBorrar").addEventListener("click", borrar);
   $c("chatForm").addEventListener("submit", e => {
     e.preventDefault();
+    if(ocupado) return;                          // Covid aún responde: el texto escrito se conserva
     const campo = $c("chatTexto"); const t = campo.value; campo.value = "";
     enviar(t);
+  });
+  // Los botones no le quitan el foco al campo de texto: así el teclado del celular no se esconde al enviar
+  pantalla.querySelectorAll("button").forEach(b => {
+    b.addEventListener("pointerdown", e => e.preventDefault());
+    b.addEventListener("mousedown", e => e.preventDefault());
   });
   document.addEventListener("keydown", e => { if(e.key === "Escape" && !pantalla.hidden) cerrar(); });
 
   leer();
   actualizarBoton();
-  window.ChatCovid = { abrir, cerrar, enviar, actualizarBoton, caraSVG, ANIMOS, MAX_DIA, MAX_HISTORIAL, MAX_CARACTERES, SIN_VOZ, SIN_PALABRAS };   // para pruebas
+  window.ChatCovid = { abrir, cerrar, enviar, actualizarBoton, caraSVG, ajustarAlto, ANIMOS, MAX_DIA, MAX_HISTORIAL, MAX_CARACTERES, SIN_VOZ, SIN_PALABRAS };   // para pruebas
 })();
