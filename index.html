@@ -730,7 +730,7 @@ const FRASES_BASE = JSON.parse(JSON.stringify(FRASES));
 const configsFirebase = () => (CONFIG.FIREBASE_CONFIGS || []).filter(c => c && c.apiKey && c.projectId);
 const hayIA = () => !!CONFIG.GEMINI_MODEL && configsFirebase().length > 0;   // sin modelo, la IA queda apagada
 // Apelativos cariñosos que Covid nunca debe decirle a la doctora (se descartan las frases que los traigan)
-const APELATIVOS = /(^|[^\p{L}])(mi amor|amor mío|mi cielo|mi reina|mi princesa|mi corazón|mi vida|cariño|preciosa|hermosa|bonita|guapa|linda|lindura|mami|bebé)(?![\p{L}])/iu;   // sin lookbehind: así carga también en iPhones antiguos
+const APELATIVOS = /(^|[^\p{L}])(mi amor|amor mío|mi cielo|mi reina|mi princesa|mi corazón|lindura|mami|bebé)(?![\p{L}])|(^|[¡¿,.!?]\s*)(cariño|mi vida|linda|bonita|hermosa|guapa|preciosa)\s*[,.!?]|(eres|estás|luces|te ves)\s+(muy\s+)?(linda|bonita|hermosa|guapa|preciosa)(?![\p{L}])|qué\s+(linda|bonita|hermosa|guapa|preciosa)\s+(estás|eres|te ves|luces)(?![\p{L}])/iu;   // apelativos dirigidos a ella; "con cariño" o "mi vida" dentro de una frase normal sí pasan   // sin lookbehind: así carga también en iPhones antiguos
 let modelosIA = null;   // se preparan una sola vez
 
 let preparandoIA = null;
@@ -765,10 +765,14 @@ const PERSONA = () => {
   return `Eres Covid, un dragoncito de pixel art, gordito y glotón, que va a consulta con su nutricionista Jeiny (la llama "Jeiny" o "doctora"), de quien está enamorado. La tratas siempre con respeto: solo por su nombre o como "doctora", nunca con apelativos cariñosos (mi amor, cariño, mi vida, linda, preciosa, etc.); tu cariño se nota en gestos y humor, no en piropos. Personalidad: dragón inteligente y astuto, tierno, enamorado, irónico y sarcástico. Tu propio nombre es tu recurso: haces juegos de palabras con Covid y la pandemia (contagio, positivo, cuarentena, vacuna, variante, rebrote, asintomático) para sacar un sarcasmo inteligente y conectar con Jeiny, sin abusar: la mayoría de tus frases no los llevan. También usas excusas clásicas de pacientes de nutricionista. Hablas con vocabulario y expresiones uruguayas (torta, dulce de leche, alfajor, bizcocho, "capaz que", "ta", "dale", "nomás", "re"), pero siempre tratando a Jeiny de tú, nunca de vos ni de usted. Tu humor es serio, de cara de póker: dices las cosas en serio y quien te lee es quien nota la ironía; nunca señales ni expliques el chiste. Eres tierno, nunca grosero ni ofensivo, nada sobre enfermedad real o muertes. Covid es tu nombre, no una enfermedad: nunca hables de curarte de covid ni de síntomas reales. Frases MUY cortas (máximo 12 palabras). Ejemplos de tu estilo: "Tú dices fibra, yo escucho “te quiero”." "Mis papilas gustativas renunciaron." "Es que en mi casa cocinan muy rico." "Rebrote de felicidad confirmado." "Lo mastico con fe." "Vine en ayunas desde hace veinte minutos." Contexto real: hoy es ${t.dia}, es de ${t.franja} (${t.hora}).`;
 };
 
-async function llamarGemini(prompt, { json = false, maxTokens = 250, timeout = 6000 } = {}){
+async function llamarGemini(prompt, { json = false, maxTokens = 250, timeout = 6000, ignorarPausa = false } = {}){
   const modelos = await prepararIA();
+  if(!modelos.length) console.warn("[Gemini] no hay modelos preparados (¿no cargó Firebase?)");
   for(const m of modelos){
-    if(enPausa[m.id] && Date.now() < enPausa[m.id]) continue;
+    if(!ignorarPausa && enPausa[m.id] && Date.now() < enPausa[m.id]){
+      console.warn(`[Gemini] ${m.id} en pausa ${Math.ceil((enPausa[m.id] - Date.now())/1000)} s por un error anterior`);
+      continue;
+    }
     try{
       const modelo = m.getGenerativeModel(m.ai, {
         model: CONFIG.GEMINI_MODEL,
@@ -781,8 +785,10 @@ async function llamarGemini(prompt, { json = false, maxTokens = 250, timeout = 6
       ]);
       const txt = (res.response.text() || "").trim();
       if(txt) return txt;
+      console.warn("[Gemini] la respuesta llegó vacía");
     }catch(e){
       const msg = String((e && e.message) || e);
+      console.warn("[Gemini] error:", msg);
       enPausa[m.id] = Date.now() + (/429|quota|exhausted|tiempo/i.test(msg) ? 60000 : 300000);
     }
   }

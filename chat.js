@@ -228,13 +228,21 @@ ${ejemplos}
 Conversación reciente:
 ${lineas}
 Responde SOLO un objeto JSON: {"texto": "tu respuesta", "animo": "normal | amor | asco | feliz | sorprendido | triste | picaro | pensativo | sonrojado"}. Elige el ánimo según lo que sientes al responder: amor si ella te dice algo tierno; asco si hablan de comida sana que no te gusta; feliz si hablan de dulces, logros o alegría; sorprendido si algo te toma por sorpresa; triste si hablan de algo que te da pena (la báscula, el brócoli, extrañar a Ophelia); picaro si bromeas con picardía; pensativo si dudas o reflexionas; sonrojado si te da pena o te halagan; normal en los demás casos.`;
-    try{
-      const crudo = await llamarGemini(prompt, { json: true, maxTokens: 700, timeout: 15000 });
-      const r = JSON.parse(crudo.replace(/```json|```/g, "").trim());
-      const texto = typeof r.texto === "string" ? r.texto.trim() : "";
-      if(texto.length < 2 || texto.length > 700 || APELATIVOS.test(texto)) return null;
-      return { texto, animo: ANIMOS.includes(r.animo) ? r.animo : "normal" };
-    }catch(e){ return null; }
+    // Hasta dos intentos. Es un mensaje que ella acaba de escribir, así que no depende de la pausa automática del juego.
+    for(let intento = 1; intento <= 2; intento++){
+      let crudo = "";
+      try{
+        crudo = await llamarGemini(prompt, { json: true, maxTokens: 700, timeout: 15000, ignorarPausa: true });
+        const r = JSON.parse(crudo.replace(/```json|```/g, "").trim());
+        const texto = typeof r.texto === "string" ? r.texto.trim() : "";
+        if(texto.length < 2 || texto.length > 700){ console.warn(`[chat] intento ${intento}: respuesta descartada por su largo (${texto.length})`); continue; }
+        if(APELATIVOS.test(texto)){ console.warn(`[chat] intento ${intento}: respuesta descartada por un apelativo:`, texto); continue; }
+        return { texto, animo: ANIMOS.includes(r.animo) ? r.animo : "normal" };
+      }catch(e){
+        console.warn(`[chat] intento ${intento} falló:`, (e && e.message) || e, crudo ? "| respuesta cruda: " + crudo.slice(0, 200) : "");
+      }
+    }
+    return null;
   }
 
   // ---------- acciones ----------
