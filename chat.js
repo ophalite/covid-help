@@ -20,8 +20,10 @@
     sorprendido: () => ojos(["EEE","EIE","EEE"], ["EEE","EIE","EEE"]) + pxs([[5,4],[6,4],[7,4],[12,4],[13,4],[14,4]], "K") + pxs([[9,11],[10,11],[9,12],[10,12]], "M"),
     triste:      () => ojos(["EEE","EII","EII"], ["EEE","EII","EII"]) + pxs([[5,5],[6,5],[7,4],[12,4],[13,5],[14,5]], "K") + pxs([[6,9],[6,10],[13,9],[13,10]], "T") + pxs([[9,11],[10,11]], "M"),
     picaro:      () => ojos(["BBB","KKK","BBB"], ["EEE","EII","EII"]) + pxs([[12,4],[13,4],[14,4]], "K") + pxs([[9,12],[10,12],[12,11]], "M"),
-    pensativo:   () => ojos(["EII","EEE","EEE"], ["EII","EEE","EEE"]) + pxs([[5,5],[6,5],[7,5],[12,4],[13,4],[14,4]], "K") + px(10, 12, "M"),
-    sonrojado:   () => ojos(["EEE","EEE","EII"], ["EEE","EEE","IIE"]) + pxs([[5,9],[6,9],[7,9],[12,9],[13,9],[14,9],[4,10],[5,10],[14,10],[15,10]], "F") + pxs([[9,12],[10,12]], "M")
+    pensativo:   () => ojos(["EIE","EIE","EEE"], ["EIE","EIE","EEE"]) + pxs([[5,4],[6,4],[7,4],[12,4],[13,4],[14,4]], "K") + px(10, 12, "M"),
+    sonrojado:   () => ojos(["EEE","EEE","EII"], ["EEE","EEE","IIE"]) + pxs([[5,9],[6,9],[7,9],[12,9],[13,9],[14,9],[4,10],[5,10],[14,10],[15,10]], "F") + pxs([[9,12],[10,12]], "M"),
+    // solo para "escribiendo": mira hacia abajo, concentrado, con la lengüita afuera (la IA no lo elige)
+    escribiendo: () => ojos(["EEE","EIE","EIE"], ["EEE","EIE","EIE"]) + pxs([[5,5],[6,5],[7,5],[12,5],[13,5],[14,5]], "K") + pxs([[9,11],[10,11]], "M") + pxs([[11,12],[12,12]], "F")
   };
   function caraSVG(animo){
     const base = GESTOS_NUEVOS[animo] ? "normal" : (ANIMOS.includes(animo) ? animo : "normal");
@@ -152,7 +154,7 @@
   function burbujaEscribiendo(){
     const m = document.createElement("div");
     m.className = "msg covid escribiendo";
-    m.appendChild(avatar("pensativo", "balanceo"));
+    m.appendChild(avatar("escribiendo", "balanceo"));
     const b = document.createElement("div");
     b.className = "burbuja";
     b.innerHTML = `escribiendo<span class="puntos" aria-hidden="true"><i></i><i></i><i></i></span>`;
