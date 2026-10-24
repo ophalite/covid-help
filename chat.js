@@ -248,19 +248,7 @@ Responde SOLO un objeto JSON: {"texto": "tu respuesta", "animo": "normal | amor 
     boton.focus();
   }
 
-  /* Interruptor secreto mientras se prueba: abrir el juego con ?chat activa el botón en ese navegador
-     (queda guardado); con ?chat=0 se vuelve a apagar. Para abrirlo a todos, poner CHAT_PUBLICO = true. */
-  const CHAT_PUBLICO = false;
-  function chatActivado(){
-    if(CHAT_PUBLICO || DEMO) return true;
-    const q = new URLSearchParams(location.search);
-    try{
-      if(q.get("chat") === "0") localStorage.removeItem("covid-chat-activo");
-      else if(q.has("chat")) localStorage.setItem("covid-chat-activo", "1");
-      return localStorage.getItem("covid-chat-activo") === "1";
-    }catch(e){ return q.has("chat") && q.get("chat") !== "0"; }
-  }
-  function actualizarBoton(){ boton.hidden = !(chatActivado() && (hayIA() || DEMO)); }   // sin IA no hay con quién hablar
+  function actualizarBoton(){ boton.hidden = !(hayIA() || DEMO); }   // sin IA no hay con quién hablar
 
   boton.addEventListener("click", abrir);
   $c("chatCerrar").addEventListener("click", cerrar);
